@@ -77,7 +77,7 @@ master_agent = CodeAgent(
 
 
 def main():
-    GradioUI(master_agent).launch()
+    GradioUI(master_agent).launch(pwa=True)
 
 
 if __name__ == "__main__":
