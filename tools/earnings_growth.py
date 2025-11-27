@@ -81,23 +81,71 @@ def get_downloaded_pdfs(url,row_identifier) -> list:
             # Set up download behavior
             page.context.set_default_timeout(30000)
             
-            # Function to download PDF from a link
+            # Collect all PDF links first before downloading (chunked approach)
+            pdf_link_elements = []
+            
+            def collect_pdf_links():
+                """Collect all PDF link elements from current page"""
+                page_links = []
+                
+                # Process rows to collect links
+                try:
+                    rows = page.locator(row_identifier)
+                    rows_count = rows.count()
+                    print(f"Found {rows_count} rows")
+                    
+                    for i in range(rows_count):
+                        row = rows.nth(i)
+                        pdf_links = row.locator("td a[href*='.pdf']")
+                        link_count = pdf_links.count()
+                        
+                        for j in range(link_count):
+                            link = pdf_links.nth(j)
+                            href = link.get_attribute("href")
+                            # Check for FINANCIAL_STATEMENT requirement
+                            if href and href.endswith('.pdf') and "FINANCIAL_STATEMENT" in href:
+                                page_links.append((link, f"{i}_{j}"))
+                                
+                except Exception as e:
+                    print(f"Error collecting links from rows: {e}")
+                
+                # Alternative approach: look for all PDF links in the table
+                if not page_links:
+                    print("Trying alternative approach to find PDF links")
+                    try:
+                        all_pdf_links = page.locator("tbody#ngx_finStatement a[href*='.pdf']")
+                        link_count = all_pdf_links.count()
+                        print(f"Found {link_count} PDF links using alternative selector")
+                        
+                        for i in range(link_count):
+                            link = all_pdf_links.nth(i)
+                            href = link.get_attribute("href")
+                            # Check for FINANCIAL_STATEMENT requirement
+                            if href and href.endswith('.pdf') and "FINANCIAL_STATEMENT" in href:
+                                page_links.append((link, f"alt_{i}"))
+                                
+                    except Exception as e:
+                        print(f"Error with alternative approach: {e}")
+                
+                return page_links
+            
+            # Function to download PDF from a link element
             def download_pdf_from_link(link_element, index):
                 try:
                     href = link_element.get_attribute("href")
-
-                    if "FINANCIAL_STATEMENT" not in href and "FINANCIAL_STATEMENT" not in href:
-
+                    
+                    # Check for FINANCIAL_STATEMENT requirement
+                    if not href or "FINANCIAL_STATEMENT" not in href:
                         return ""
-
-                    if href and href.endswith('.pdf'):
+                    
+                    if href.endswith('.pdf'):
                         # Get the filename from the href
                         filename = href.split('/')[-1]
                         if not filename.endswith('.pdf'):
                             filename += '.pdf'
                         
                         # Create full path for the download
-                        download_path = os.path.join(temp_dir, "downloads",f"{index}_{filename}")
+                        download_path = os.path.join(temp_dir, "downloads", f"{index}_{filename}")
                         
                         # Download the PDF
                         with page.expect_download() as download_info:
@@ -112,41 +160,8 @@ def get_downloaded_pdfs(url,row_identifier) -> list:
                 except Exception as e:
                     print(f"Error downloading PDF: {e}")
             
-            # Process rows
-            try:
-                # random_loc = page.locator("table tbody tr")
-                # print(f"Found {random_loc.count()} rows in the table")
-                rows = page.locator(row_identifier)
-                rows_count = rows.count()
-                print(f"Found {rows_count} rows")
-                
-                for i in range(rows_count):
-                    row = rows.nth(i)
-                    # Look for anchor tag with PDF link in the row
-                    pdf_links = row.locator("td a[href*='.pdf']")
-                    link_count = pdf_links.count()
-                    
-                    for j in range(link_count):
-                        link = pdf_links.nth(j)
-                        download_pdf_from_link(link, f"{i}_{j}")
-                        
-            except Exception as e:
-                print(f"Error processing even rows: {e}")
-            
-            # Alternative approach: look for all PDF links in the table
-            if not downloaded_pdfs:
-                print("Trying alternative approach to find PDF links")
-                try:
-                    all_pdf_links = page.locator("tbody#ngx_finStatement a[href*='.pdf']")
-                    link_count = all_pdf_links.count()
-                    print(f"Found {link_count} PDF links using alternative selector")
-                    
-                    for i in range(link_count):
-                        link = all_pdf_links.nth(i)
-                        download_pdf_from_link(link, f"alt_{i}")
-                        
-                except Exception as e:
-                    print(f"Error with alternative approach: {e}")
+            # Collect links from first page
+            pdf_link_elements.extend(collect_pdf_links())
             
             # Handle pagination - navigate through all pages
             print("Starting pagination handling...")
@@ -199,48 +214,39 @@ def get_downloaded_pdfs(url,row_identifier) -> list:
                     page.wait_for_load_state("networkidle")
                     time.sleep(3)  # Additional wait for content to load
                     
-                    # Download PDFs from the new page using the same logic
-                    page_pdfs_found = False
-                    
-                    # Process even rows on new page
-                    try:
-                        rows = page.locator(row_identifier)
-                        rows_count = rows.count()
-                        print(f"Found {rows_count} even rows on page {page_number + 1}")
-                        
-                        for i in range(rows_count):
-                            row = rows.nth(i)
-                            pdf_links = row.locator("td a[href*='.pdf']")
-                            link_count = pdf_links.count()
-                            
-                            for j in range(link_count):
-                                link = pdf_links.nth(j)
-                                download_pdf_from_link(link, f"page{page_number + 1}_even_{i}_{j}")
-                                page_pdfs_found = True
-                                
-                    except Exception as e:
-                        print(f"Error processing even rows on page {page_number + 1}: {e}")
-                    
-                    # Alternative approach for new page if no PDFs found
-                    if not page_pdfs_found:
-                        print(f"Trying alternative approach on page {page_number + 1}")
-                        try:
-                            all_pdf_links = page.locator("#ngx_finStatement a[href*='.pdf']")
-                            link_count = all_pdf_links.count()
-                            print(f"Found {link_count} PDF links using alternative selector on page {page_number + 1}")
-                            
-                            for i in range(link_count):
-                                link = all_pdf_links.nth(i)
-                                download_pdf_from_link(link, f"page{page_number + 1}_alt_{i}")
-                                
-                        except Exception as e:
-                            print(f"Error with alternative approach on page {page_number + 1}: {e}")
+                    # Collect links from new page (don't download yet)
+                    page_links = collect_pdf_links()
+                    if page_links:
+                        # Update indices for pagination
+                        updated_links = [(link, f"page{page_number + 1}_{idx}") for link, idx in page_links]
+                        pdf_link_elements.extend(updated_links)
                     
                     page_number += 1
                     
                 except Exception as e:
                     print(f"Error handling pagination on page {page_number}: {e}")
                     break
+            
+            # Now download all collected PDFs in chunks of 10
+            total_links = len(pdf_link_elements)
+            print(f"Total PDF links collected: {total_links}")
+            print(f"Starting chunked download (chunks of 10)...")
+            
+            download_chunk_size = 10
+            for chunk_start in range(0, total_links, download_chunk_size):
+                chunk_end = min(chunk_start + download_chunk_size, total_links)
+                chunk = pdf_link_elements[chunk_start:chunk_end]
+                
+                print(f"Downloading chunk {chunk_start // download_chunk_size + 1} ({len(chunk)} PDFs: {chunk_start + 1}-{chunk_end} of {total_links})")
+                
+                for link_element, index in chunk:
+                    download_pdf_from_link(link_element, index)
+                    time.sleep(0.5)  # Small delay between downloads
+                
+                # Longer delay between chunks to avoid overwhelming the system
+                if chunk_end < total_links:
+                    print(f"Chunk completed. Waiting before next chunk...")
+                    time.sleep(2)
         
             browser.close()
             

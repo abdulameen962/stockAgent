@@ -7,31 +7,162 @@ import time
 from typing import List
 from PIL import Image
 from tools.image_analysis import read_images
+import gc
 
-def create_images_from_pdfs(downloaded_pdfs):
-    # paths = ["C:/Users/hp/Documents/ai/stockAgent/disc.pdf"]
-    # Parse PDFs and extract information using camelot
+def get_pdf_page_count(pdf_path):
+    """
+    Get the total number of pages in a PDF file.
+    
+    Args:
+        pdf_path (str): Path to the PDF file
+        
+    Returns:
+        int: Total number of pages in the PDF, or None if unable to determine
+    """
+    try:
+        # Try using PyPDF2 if available
+        try:
+            from PyPDF2 import PdfReader
+            reader = PdfReader(pdf_path)
+            return len(reader.pages)
+        except ImportError:
+            # If PyPDF2 is not available, try alternative method
+            try:
+                import fitz  # PyMuPDF
+                doc = fitz.open(pdf_path)
+                page_count = len(doc)
+                doc.close()
+                return page_count
+            except ImportError:
+                # Fallback: estimate by trying to process pages incrementally
+                return None
+    except Exception as e:
+        print(f"Warning: Could not determine page count for {pdf_path}: {e}")
+        return None
+
+def create_images_from_pdfs(downloaded_pdfs, chunk_size=5):
+    """
+    Convert PDF files to images, processing in chunks to reduce memory usage.
+    
+    This function processes PDFs page by page or in small batches to prevent
+    memory errors on small machines. Each chunk is processed and freed before
+    moving to the next.
+    
+    Args:
+        downloaded_pdfs (list): List of paths to PDF files to process
+        chunk_size (int): Number of pages to process at once (default: 5)
+                         Smaller values use less memory but may be slower
+        
+    Returns:
+        list: List of PIL Image objects extracted from all PDFs
+    """
     information_array = []
     
     for pdf_path in downloaded_pdfs:
         try:
             print(f"Processing PDF: {pdf_path}")
-            # Convert PDF to images
-            images = convert_from_path(pdf_path, dpi=200)
-
-            for image in images:
-
-                # print("image ",image," type ",type(image))
-
-                information_array.append(image)
-
-                print(f"Converted {pdf_path} to image {image}")
+            
+            # Get total page count if possible
+            total_pages = get_pdf_page_count(pdf_path)
+            processed_successfully = False
+            
+            if total_pages is None:
+                # Try to process all pages at once first (for small PDFs)
+                # If this fails with MemoryError, fall back to chunked processing
+                print(f"Page count unknown, attempting to process all pages at once for {pdf_path}")
+                try:
+                    images = convert_from_path(pdf_path, dpi=200)
+                    for image in images:
+                        information_array.append(image)
+                        print(f"Converted {pdf_path} to image")
+                    # Free memory
+                    del images
+                    gc.collect()
+                    processed_successfully = True
+                except MemoryError as e:
+                    print(f"Memory error processing {pdf_path}: {e}")
+                    print("Falling back to incremental chunked processing...")
+                    processed_successfully = False
+                except Exception as e:
+                    print(f"Error processing {pdf_path}: {e}")
+                    processed_successfully = False
+            
+            if not processed_successfully:
+                if total_pages is not None:
+                    # Process PDF in chunks with known page count
+                    print(f"Processing {total_pages} pages in chunks of {chunk_size}")
+                    
+                    for start_page in range(1, total_pages + 1, chunk_size):
+                        end_page = min(start_page + chunk_size - 1, total_pages)
+                        print(f"Processing pages {start_page}-{end_page} of {total_pages}")
+                        
+                        try:
+                            # Convert chunk of pages
+                            chunk_images = convert_from_path(
+                                pdf_path,
+                                dpi=200,
+                                first_page=start_page,
+                                last_page=end_page
+                            )
+                            
+                            # Add images to result array
+                            for image in chunk_images:
+                                information_array.append(image)
+                                print(f"Converted page from {pdf_path} to image")
+                            
+                            # Free memory immediately after processing chunk
+                            del chunk_images
+                            gc.collect()
+                            
+                        except Exception as e:
+                            print(f"Error processing pages {start_page}-{end_page} of {pdf_path}: {e}")
+                            continue
+                else:
+                    # Incremental approach: try processing small chunks until we get an error
+                    print(f"Using incremental chunked processing for {pdf_path}")
+                    current_page = 1
+                    
+                    while True:
+                        try:
+                            # Try to process next chunk
+                            chunk_images = convert_from_path(
+                                pdf_path,
+                                dpi=200,
+                                first_page=current_page,
+                                last_page=current_page + chunk_size - 1
+                            )
+                            
+                            if not chunk_images:
+                                # No more pages
+                                break
+                            
+                            # Add images to result array
+                            for image in chunk_images:
+                                information_array.append(image)
+                                print(f"Converted page from {pdf_path} to image")
+                            
+                            # Free memory
+                            del chunk_images
+                            gc.collect()
+                            
+                            # Move to next chunk
+                            current_page += chunk_size
+                            
+                        except Exception as e:
+                            # Likely reached end of PDF or error
+                            if current_page == 1:
+                                # Error on first chunk, this PDF might be corrupted
+                                print(f"Failed to process first chunk of {pdf_path}: {e}")
+                            break
 
         except Exception as e:
             print(f"Error processing PDF {pdf_path}: {e}")
             continue
+        
+        # Force garbage collection after each PDF
+        gc.collect()
     
-    print(f"Successfully extracted information from {len(information_array)} PDFs")
+    print(f"Successfully extracted information from {len(information_array)} images across {len(downloaded_pdfs)} PDFs")
     
     return information_array
 
@@ -105,7 +236,53 @@ def get_downloaded_pdfs(url,row_identifier) -> list:
             # Set up download behavior
             page.context.set_default_timeout(30000)
             
-            # Function to download PDF from a link
+            # Collect all PDF links first before downloading (chunked approach)
+            pdf_link_elements = []
+            
+            def collect_pdf_links():
+                """Collect all PDF link elements from current page"""
+                page_links = []
+                
+                # Process rows to collect links
+                try:
+                    rows = page.locator(row_identifier)
+                    rows_count = rows.count()
+                    print(f"Found {rows_count} rows")
+                    
+                    for i in range(rows_count):
+                        row = rows.nth(i)
+                        pdf_links = row.locator("td a[href*='.pdf']")
+                        link_count = pdf_links.count()
+                        
+                        for j in range(link_count):
+                            link = pdf_links.nth(j)
+                            href = link.get_attribute("href")
+                            if href and href.endswith('.pdf'):
+                                page_links.append((link, f"{i}_{j}"))
+                                
+                except Exception as e:
+                    print(f"Error collecting links from rows: {e}")
+                
+                # Alternative approach: look for all PDF links in the table
+                if not page_links:
+                    print("Trying alternative approach to find PDF links")
+                    try:
+                        all_pdf_links = page.locator("tbody#corpDisclose a[href*='.pdf']")
+                        link_count = all_pdf_links.count()
+                        print(f"Found {link_count} PDF links using alternative selector")
+                        
+                        for i in range(link_count):
+                            link = all_pdf_links.nth(i)
+                            href = link.get_attribute("href")
+                            if href and href.endswith('.pdf'):
+                                page_links.append((link, f"alt_{i}"))
+                                
+                    except Exception as e:
+                        print(f"Error with alternative approach: {e}")
+                
+                return page_links
+            
+            # Function to download PDF from a link element
             def download_pdf_from_link(link_element, index):
                 try:
                     href = link_element.get_attribute("href")
@@ -116,7 +293,7 @@ def get_downloaded_pdfs(url,row_identifier) -> list:
                             filename += '.pdf'
                         
                         # Create full path for the download
-                        download_path = os.path.join(temp_dir, "downloads",f"{index}_{filename}")
+                        download_path = os.path.join(temp_dir, "downloads", f"{index}_{filename}")
                         
                         # Download the PDF
                         with page.expect_download() as download_info:
@@ -131,41 +308,8 @@ def get_downloaded_pdfs(url,row_identifier) -> list:
                 except Exception as e:
                     print(f"Error downloading PDF: {e}")
             
-            # Process rows
-            try:
-                # random_loc = page.locator("table tbody tr")
-                # print(f"Found {random_loc.count()} rows in the table")
-                rows = page.locator(row_identifier)
-                rows_count = rows.count()
-                print(f"Found {rows_count} rows")
-                
-                for i in range(rows_count):
-                    row = rows.nth(i)
-                    # Look for anchor tag with PDF link in the row
-                    pdf_links = row.locator("td a[href*='.pdf']")
-                    link_count = pdf_links.count()
-                    
-                    for j in range(link_count):
-                        link = pdf_links.nth(j)
-                        download_pdf_from_link(link, f"{i}_{j}")
-                        
-            except Exception as e:
-                print(f"Error processing even rows: {e}")
-            
-            # Alternative approach: look for all PDF links in the table
-            if not downloaded_pdfs:
-                print("Trying alternative approach to find PDF links")
-                try:
-                    all_pdf_links = page.locator("tbody#corpDisclose a[href*='.pdf']")
-                    link_count = all_pdf_links.count()
-                    print(f"Found {link_count} PDF links using alternative selector")
-                    
-                    for i in range(link_count):
-                        link = all_pdf_links.nth(i)
-                        download_pdf_from_link(link, f"alt_{i}")
-                        
-                except Exception as e:
-                    print(f"Error with alternative approach: {e}")
+            # Collect links from first page
+            pdf_link_elements.extend(collect_pdf_links())
             
             # Handle pagination - navigate through all pages
             print("Starting pagination handling...")
@@ -216,48 +360,39 @@ def get_downloaded_pdfs(url,row_identifier) -> list:
                     page.wait_for_load_state("networkidle")
                     time.sleep(3)  # Additional wait for content to load
                     
-                    # Download PDFs from the new page using the same logic
-                    page_pdfs_found = False
-                    
-                    # Process even rows on new page
-                    try:
-                        rows = page.locator(row_identifier)
-                        rows_count = rows.count()
-                        print(f"Found {rows_count} even rows on page {page_number + 1}")
-                        
-                        for i in range(rows_count):
-                            row = rows.nth(i)
-                            pdf_links = row.locator("td a[href*='.pdf']")
-                            link_count = pdf_links.count()
-                            
-                            for j in range(link_count):
-                                link = pdf_links.nth(j)
-                                download_pdf_from_link(link, f"page{page_number + 1}_even_{i}_{j}")
-                                page_pdfs_found = True
-                                
-                    except Exception as e:
-                        print(f"Error processing even rows on page {page_number + 1}: {e}")
-                    
-                    # Alternative approach for new page if no PDFs found
-                    if not page_pdfs_found:
-                        print(f"Trying alternative approach on page {page_number + 1}")
-                        try:
-                            all_pdf_links = page.locator("#latestdisclosures a[href*='.pdf']")
-                            link_count = all_pdf_links.count()
-                            print(f"Found {link_count} PDF links using alternative selector on page {page_number + 1}")
-                            
-                            for i in range(link_count):
-                                link = all_pdf_links.nth(i)
-                                download_pdf_from_link(link, f"page{page_number + 1}_alt_{i}")
-                                
-                        except Exception as e:
-                            print(f"Error with alternative approach on page {page_number + 1}: {e}")
+                    # Collect links from new page (don't download yet)
+                    page_links = collect_pdf_links()
+                    if page_links:
+                        # Update indices for pagination
+                        updated_links = [(link, f"page{page_number + 1}_{idx}") for link, idx in page_links]
+                        pdf_link_elements.extend(updated_links)
                     
                     page_number += 1
                     
                 except Exception as e:
                     print(f"Error handling pagination on page {page_number}: {e}")
                     break
+            
+            # Now download all collected PDFs in chunks of 10
+            total_links = len(pdf_link_elements)
+            print(f"Total PDF links collected: {total_links}")
+            print(f"Starting chunked download (chunks of 10)...")
+            
+            download_chunk_size = 10
+            for chunk_start in range(0, total_links, download_chunk_size):
+                chunk_end = min(chunk_start + download_chunk_size, total_links)
+                chunk = pdf_link_elements[chunk_start:chunk_end]
+                
+                print(f"Downloading chunk {chunk_start // download_chunk_size + 1} ({len(chunk)} PDFs: {chunk_start + 1}-{chunk_end} of {total_links})")
+                
+                for link_element, index in chunk:
+                    download_pdf_from_link(link_element, index)
+                    time.sleep(0.5)  # Small delay between downloads
+                
+                # Longer delay between chunks to avoid overwhelming the system
+                if chunk_end < total_links:
+                    print(f"Chunk completed. Waiting before next chunk...")
+                    time.sleep(2)
         
             browser.close()
             
