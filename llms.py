@@ -54,6 +54,55 @@ gemini_flash_lite = LiteLLMModel(
     max_tokens=2048,
 )
 
+gemini_pro_second = LiteLLMModel(
+    model_id="gemini/gemini-2.5-pro",
+    api_key=os.getenv("GEMINI_KEY_SECOND", ""),
+    temperature=0.1,
+    max_tokens=2048,
+)
+
+gemma_en4b_second  = LiteLLMModel(
+    model_id="gemini/gemma-3n-e4b-it",
+    api_key=os.getenv("GEMINI_KEY_SECOND", ""),
+    temperature=0.1,
+    max_tokens=2048,
+)
+
+gemma_27b_second  = LiteLLMModel(
+    model_id="gemini/gemma-3-27b-it",
+    api_key=os.getenv("GEMINI_KEY_SECOND", ""),
+    temperature=0.1,
+    max_tokens=2048,
+)
+
+gemini_25flash_second  = LiteLLMModel(
+    model_id="gemini/gemini-2.5-flash",
+    api_key=os.getenv("GEMINI_KEY_SECOND", ""),
+    temperature=0.1,
+    max_tokens=2048,
+)
+
+gemini_25flash_lite_second  = LiteLLMModel(
+    model_id="gemini/gemini-2.5-flash-lite",
+    api_key=os.getenv("GEMINI_KEY_SECOND", ""),
+    temperature=0.1,
+    max_tokens=2048,
+)
+
+gemini_flash_second  = LiteLLMModel(
+    model_id="gemini/gemini-2.0-flash",
+    api_key=os.getenv("GEMINI_KEY_SECOND", ""),
+    temperature=0.1,
+    max_tokens=2048,
+)
+
+gemini_flash_lite_second = LiteLLMModel(
+    model_id="gemini/gemini-2.0-flash-lite",
+    api_key=os.getenv("GEMINI_KEY_SECOND", ""),
+    temperature=0.1,
+    max_tokens=2048,
+)
+
 op_llama4_model = LiteLLMModel(
     model_id="openrouter/meta-llama/llama-4-maverick",
     api_base="https://openrouter.ai/api/v1",

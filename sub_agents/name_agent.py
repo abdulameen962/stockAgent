@@ -1,5 +1,5 @@
 from smolagents import WebSearchTool,ToolCallingAgent
-from llms import gemini_25flash_lite as model
+from llms import gemini_25flash_lite_second as model
 
 web_search = WebSearchTool()
 

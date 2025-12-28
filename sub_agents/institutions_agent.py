@@ -1,5 +1,5 @@
 from smolagents import WebSearchTool, CodeAgent
-from llms import gemini_flash as model
+from llms import gemini_flash_lite as model
 import os
 import requests
 import json

@@ -1,5 +1,5 @@
 from smolagents import WebSearchTool, CodeAgent
-from llms import gemma_en4b as model
+from llms import gemini_pro_second as model
 import os
 import requests
 import json
