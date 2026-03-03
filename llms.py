@@ -6,7 +6,7 @@ import litellm
 load_dotenv()
 
 gemini_pro = LiteLLMModel(
-    model_id="openrouter/google/gemini/gemini-2.5-pro",
+    model_id="openrouter/google/gemini-2.5-pro",
     api_key=os.getenv("OPENROUTER_KEY", ""),
     temperature=0.1,
     max_tokens=2048,
@@ -20,35 +20,35 @@ gemma_en4b = LiteLLMModel(
 )
 
 gemma_27b = LiteLLMModel(
-    model_id="openrouter/google/gemini/gemma-3-27b-it:free",
+    model_id="openrouter/google/gemma-3-27b-it:free",
     api_key=os.getenv("OPENROUTER_KEY", ""),
     temperature=0.1,
     max_tokens=2048,
 )
 
 gemini_25flash = LiteLLMModel(
-    model_id="openrouter/google/gemini/gemini-2.5-flash",
+    model_id="openrouter/google/gemini-2.5-flash",
     api_key=os.getenv("OPENROUTER_KEY", ""),
     temperature=0.1,
     max_tokens=2048,
 )
 
 gemini_25flash_lite = LiteLLMModel(
-    model_id="openrouter/google/gemini/gemini-2.5-flash-lite",
+    model_id="openrouter/google/gemini-2.5-flash-lite",
     api_key=os.getenv("OPENROUTER_KEY", ""),
     temperature=0.1,
     max_tokens=2048,
 )
 
 gemini_flash = LiteLLMModel(
-    model_id="openrouter/google/gemini/gemini-2.0-flash",
+    model_id="openrouter/google/gemini-2.0-flash",
     api_key=os.getenv("OPENROUTER_KEY", ""),
     temperature=0.1,
     max_tokens=2048,
 )
 
 gemini_pro_second = LiteLLMModel(
-    model_id="openrouter/google/gemini/gemini-2.5-pro",
+    model_id="openrouter/google/gemini-2.5-pro",
     api_key=os.getenv("OPENROUTER_KEY", ""),
     temperature=0.1,
     max_tokens=2048,
@@ -62,28 +62,28 @@ gemma_en4b_second  = LiteLLMModel(
 )
 
 gemma_27b_second  = LiteLLMModel(
-    model_id="openrouter/google/gemini/gemma-3-27b-it:free",
+    model_id="openrouter/google/gemma-3-27b-it:free",
     api_key=os.getenv("OPENROUTER_KEY", ""),
     temperature=0.1,
     max_tokens=2048,
 )
 
 gemini_25flash_second  = LiteLLMModel(
-    model_id="openrouter/google/gemini/gemini-2.5-flash",
+    model_id="openrouter/google/gemini-2.5-flash",
     api_key=os.getenv("OPENROUTER_KEY", ""),
     temperature=0.1,
     max_tokens=2048,
 )
 
 gemini_25flash_lite_second  = LiteLLMModel(
-    model_id="openrouter/google/gemini/gemini-2.5-flash-lite",
+    model_id="openrouter/google/gemini-2.5-flash-lite",
     api_key=os.getenv("OPENROUTER_KEY", ""),
     temperature=0.1,
     max_tokens=2048,
 )
 
 gemini_flash_second  = LiteLLMModel(
-    model_id="openrouter/google/gemini/gemini-2.0-flash",
+    model_id="openrouter/google/gemini-2.0-flash",
     api_key=os.getenv("OPENROUTER_KEY", ""),
     temperature=0.1,
     max_tokens=2048,
