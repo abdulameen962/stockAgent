@@ -1,5 +1,5 @@
 from smolagents import WebSearchTool, CodeAgent
-from llms import gemini_flash_lite_second as model
+from llms import gemini_25flash_lite as model
 from tools.earnings_growth import get_financial_statements
 import os
 import requests
