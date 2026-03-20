@@ -8,12 +8,13 @@ load_dotenv()
 minimax_27 = OpenAIModel(
     model_id="minimax/minimax-m2.7",
     api_key=os.getenv("OPENROUTER_KEY", ""),
+    api_base="https://openrouter.ai/api/v1",
     temperature=0.1,
     max_tokens=2048,
 )
 
 minimax_25 = OpenAIModel(
-    model_id="minimax/minimax-m2.5:free",
+    model_id="minimax/minimax-m2.5",
     api_key=os.getenv("OPENROUTER_KEY", ""),
     api_base="https://openrouter.ai/api/v1",
     temperature=0.1,
@@ -29,7 +30,8 @@ z_ai_glm_47flash = OpenAIModel(
 )
 
 step_35flash = OpenAIModel(
-    model_id="stepfun/step-3.5-flash:free",
+    model_id="stepfun/step-3.5-flash",
+    api_base="https://openrouter.ai/api/v1",
     api_key=os.getenv("OPENROUTER_KEY", ""),
     temperature=0.1,
     max_tokens=2048,
