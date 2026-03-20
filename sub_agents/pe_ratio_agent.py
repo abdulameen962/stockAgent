@@ -1,5 +1,5 @@
 from smolagents import WebSearchTool, CodeAgent, GoogleSearchTool
-from llms import gemini_25flash as model
+from llms import minimax_27 as model
 from tools.pe_ratio_tool import get_pe_ratio
 import os
 import requests

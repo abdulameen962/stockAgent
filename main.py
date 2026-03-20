@@ -1,6 +1,6 @@
 from smolagents import (CodeAgent
                         ,GradioUI)
-from llms import (gemini_25flash_lite as model)
+from llms import (minimax_25 as model)
 from sub_agents import (name_agent,disagreeable_agent,
     spinoff_agent,institutions_agent,rumours_agent,depressing_agent,
     no_growth_agent,niche_agent,recurring_agent,technology_user_agent,
@@ -8,6 +8,7 @@ from sub_agents import (name_agent,disagreeable_agent,
     stock_category_agent,pe_ratio_agent,earnings_growth_agent,
     balance_sheet_agent,cash_position_agent)
 from tools.get_company_info import get_company_info
+from tools.ngx_equities_price_list import get_ngx_equities_price_list_symbols
 
 extra = """
 
@@ -15,12 +16,19 @@ extra = """
 
 instructions = """
     You are a helpful stock analysis agent with the goal of providing the story of a stock or asset
-    and determine if it should be bought
+    and determine if it should be bought.
 
-    For every stock or asset passed in a prompt,you are to go through the following criteria for each
+    Main workflow:
+    - Start by using the get_ngx_equities_price_list_symbols tool to fetch all NGX symbols.
+    - For each symbol from that list, run the full criteria analysis below.
+    - After all analyses are done, produce a ranking from strongest buy case to weakest.
+    - Provide a full breakdown for each analyzed symbol.
+    - If the user asks follow-up questions about a specific symbol, answer directly from prior
+      analysis or run that symbol again through the criteria if needed.
 
-    The initial step is to get general company info of the company,you are to use the get_company_info tool 
-    to do this and pass it to managed agents
+    For every stock or asset you analyze, you must go through the following criteria.
+    The initial step is to get general company info of the company, use get_company_info
+    and pass relevant context to managed agents.
 
     1. The insiders are buyers
     2. The company is buying back shares
@@ -43,17 +51,17 @@ instructions = """
     18 Determine what category/type of stock whether it is a slow grower,stalwart,fast grower,
     cyclical,turnaround,asset play or a new issue
 
-    You are to distribute this to the managed agents in the order of the criteria above,and then give the story based on this and
-    decide if the stock should be bought or not
+    You are to distribute this to the managed agents in the order of the criteria above, then give the story based on this and
+    decide if the stock should be bought or not.
 
     You must go through only all the criteria above and then give a final summary of the stock
-    and whether it should be bought or not
+    and whether it should be bought or not.
 
-    You must use the specialized agents for every criteria
+    You must use the specialized agents for every criteria.
     
     You must always go through the steps and after completion go through the'
     requirements
-    to confirm if everything has been fulfilled before giving a final answer
+    to confirm if everything has been fulfilled before giving a final answer.
 """
 
 managed_agents = [name_agent,pe_ratio_agent,disagreeable_agent,
@@ -66,13 +74,13 @@ master_agent = CodeAgent(
     managed_agents=managed_agents,
     model=model,
     planning_interval=8,  # Activate planning
-    max_steps=25,
-    tools=[get_company_info],
+    max_steps=400,
+    tools=[get_company_info, get_ngx_equities_price_list_symbols],
     name="stock_ai_agent",
     provide_run_summary =True,
     instructions=instructions,
     stream_outputs=True,
-    description="A stock agent that gets the story of a stock and determine category of stock"
+    description="A stock agent that analyzes and ranks NGX stocks, and answers symbol-specific follow-up questions."
 )
 
 

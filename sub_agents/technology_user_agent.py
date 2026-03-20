@@ -1,5 +1,5 @@
 from smolagents import WebSearchTool, CodeAgent
-from llms import gemini_pro_second as model
+from llms import minimax_25 as model
 import os
 import requests
 import json

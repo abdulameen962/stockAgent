@@ -1,5 +1,5 @@
 from smolagents import WebSearchTool,CodeAgent
-from llms import op_llama4_model as model
+from llms import deepseek_v32 as model
 
 search_tool = WebSearchTool()
 

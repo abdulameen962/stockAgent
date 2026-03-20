@@ -8,8 +8,7 @@ import camelot
 import pandas as pd
 import re
 
-from tools.corporate_disclosures import create_images_from_pdfs
-from tools.image_analysis import read_images
+from tools.corporate_disclosures import process_pdfs_in_batches
 
 def normalize_spacing(text):
     """
@@ -252,6 +251,7 @@ def get_downloaded_pdfs(url,row_identifier) -> list:
             
             # Create a temporary directory for downloads
             temp_dir = Path(__file__).resolve().parent.parent
+            os.makedirs(os.path.join(temp_dir, "downloads"), exist_ok=True)
             # with Path(__file__).resolve().parent.parent.parent as temp_dir:
             # Set up download behavior
             page.context.set_default_timeout(30000)
@@ -476,8 +476,7 @@ def extract_director_disclosures(ticker:str,stock_exchange:str="NGX") -> list:
     
     downloaded_pdfs = get_downloaded_pdfs(url, row_identifier)
     
-    pdf_images = create_images_from_pdfs(downloaded_pdfs)
-    text_content = read_images(pdf_images)
+    text_content = process_pdfs_in_batches(downloaded_pdfs)
     
     global tries
 
@@ -495,7 +494,7 @@ def extract_director_disclosures(ticker:str,stock_exchange:str="NGX") -> list:
     
     print(f"Cleanup completed. Deleted {len(downloaded_pdfs)} PDF files.")
 
-    if len(pdf_images) == 0 and tries < 2:
+    if len(text_content) == 0 and tries < 2:
         print("No information extracted from PDFs.Will rerun once more")
         tries += 1
         return extract_director_disclosures(ticker, stock_exchange)

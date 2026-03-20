@@ -1,5 +1,5 @@
 from smolagents import WebSearchTool, CodeAgent
-from llms import gemini_pro_second as model
+from llms import deepseek_v32 as model
 import os
 import requests
 import json

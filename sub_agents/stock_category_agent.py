@@ -1,6 +1,6 @@
 from smolagents import WebSearchTool, CodeAgent
 from tools.earnings_growth import get_financial_statements
-from llms import gemini_25flash_lite_second as model
+from llms import deepseek_v32 as model
 import os
 import requests
 import json

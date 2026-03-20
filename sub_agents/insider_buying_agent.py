@@ -1,5 +1,5 @@
 from smolagents import WebSearchTool, CodeAgent
-from llms import op_qwen_3_model as model
+from llms import z_ai_glm_47flash as model
 import os
 import requests
 import json

@@ -8,6 +8,42 @@ from typing import List
 from PIL import Image
 from tools.image_analysis import read_images
 import gc
+from itertools import islice
+
+PDF_ANALYSIS_BATCH_SIZE = 20
+
+
+def _chunked(items, size):
+    iterator = iter(items)
+    while True:
+        batch = list(islice(iterator, size))
+        if not batch:
+            break
+        yield batch
+
+
+def process_pdfs_in_batches(downloaded_pdfs, chunk_size: int = PDF_ANALYSIS_BATCH_SIZE):
+    """
+    Convert and OCR PDFs in small batches to avoid holding all images in memory.
+    """
+    all_text_content = []
+    for pdf_batch in _chunked(downloaded_pdfs, chunk_size):
+        images_array = create_images_from_pdfs(pdf_batch)
+        if not images_array:
+            continue
+        batch_text = read_images(images_array)
+        if isinstance(batch_text, list):
+            all_text_content.extend(batch_text)
+
+        # Explicitly release PIL image memory between batches
+        for image in images_array:
+            try:
+                image.close()
+            except Exception:
+                pass
+        del images_array
+        gc.collect()
+    return all_text_content
 
 def get_pdf_page_count(pdf_path):
     """
@@ -232,6 +268,7 @@ def get_downloaded_pdfs(url,row_identifier) -> list:
             
             # Create a temporary directory for downloads
             temp_dir = Path(__file__).resolve().parent.parent
+            os.makedirs(os.path.join(temp_dir, "downloads"), exist_ok=True)
             # with Path(__file__).resolve().parent.parent.parent as temp_dir:
             # Set up download behavior
             page.context.set_default_timeout(30000)
@@ -451,8 +488,7 @@ def extract_corporate_disclosures(ticker:str,stock_exchange:str="NGX") -> List:
 
     downloaded_pdfs = get_downloaded_pdfs(url, row_identifier)
 
-    images_array = create_images_from_pdfs(downloaded_pdfs)
-    text_content = read_images(images_array)
+    text_content = process_pdfs_in_batches(downloaded_pdfs)
 
     global tries
     # Delete all downloaded PDFs after extracting information
@@ -469,7 +505,7 @@ def extract_corporate_disclosures(ticker:str,stock_exchange:str="NGX") -> List:
     
     print(f"Cleanup completed. Deleted {len(downloaded_pdfs)} PDF files.")
 
-    if len(images_array) == 0 and tries < 2:
+    if len(text_content) == 0 and tries < 2:
         print("No information extracted from PDFs.Will rerun once more")
         tries += 1
         return extract_corporate_disclosures(ticker, stock_exchange)

@@ -1,5 +1,5 @@
 from smolagents import WebSearchTool, CodeAgent
-from llms import gemini_25flash_second as model
+from llms import minimax_27 as model
 import os
 import requests
 
