@@ -94,6 +94,16 @@ def _row_to_record(row: sqlite3.Row, include_full_text: bool = False) -> Dict[st
 def get_ocr_aggregate(ticker: str, source_type: str = "all") -> Dict[str, Any]:
     """
     Returns aggregate OCR stats for a ticker.
+
+    Args:
+        ticker (str): Stock ticker symbol (for example, ``MTNN``).
+        source_type (str): OCR source to filter by. Use ``all`` for every source,
+            or a specific source like ``financial_statements``,
+            ``director_disclosures``, or ``corporate_disclosures``.
+
+    Returns:
+        Dict[str, Any]: Aggregate metadata including total record count and
+        first/last seen timestamps.
     """
     conn = _get_conn()
     conn.row_factory = sqlite3.Row
@@ -127,6 +137,15 @@ def get_ocr_aggregate(ticker: str, source_type: str = "all") -> Dict[str, Any]:
 def get_ocr_records(ticker: str, source_type: str = "all", limit: int = 40, offset: int = 0) -> List[Dict[str, Any]]:
     """
     Returns paginated OCR evidence snippets for a ticker.
+
+    Args:
+        ticker (str): Stock ticker symbol to query.
+        source_type (str): OCR source filter. Use ``all`` for every source.
+        limit (int): Maximum number of records to return (capped internally).
+        offset (int): Number of records to skip for pagination.
+
+    Returns:
+        List[Dict[str, Any]]: Lightweight evidence records containing ids and snippets.
     """
     safe_limit = max(1, min(limit, 200))
     safe_offset = max(0, offset)
@@ -156,6 +175,13 @@ def get_ocr_records(ticker: str, source_type: str = "all", limit: int = 40, offs
 def get_ocr_record_text(record_id: int) -> Dict[str, Any]:
     """
     Fetch full OCR text for one stored record id.
+
+    Args:
+        record_id (int): Primary key id of the OCR record in the cache.
+
+    Returns:
+        Dict[str, Any]: Full stored OCR payload for the record, or an error dict
+        if the id does not exist.
     """
     conn = _get_conn()
     conn.row_factory = sqlite3.Row
