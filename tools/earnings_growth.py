@@ -7,6 +7,8 @@ from tools.corporate_disclosures import process_pdfs_in_batches
 import os
 from pathlib import Path
 
+MAX_PDFS_PER_TICKER = 2000
+
 def get_downloaded_pdfs(url,row_identifier) -> list:
     """
     Download PDF files from the specified URL and return their paths.
@@ -188,7 +190,9 @@ def get_downloaded_pdfs(url,row_identifier) -> list:
                     for i in range(button_count):
                         button = pagination_buttons.nth(i)
                         print("button ", button)
-                        if "current" in button.get_attribute("class") or "current" in button.get_attribute("className"):
+                        class_attr = button.get_attribute("class") or ""
+                        class_name_attr = button.get_attribute("className") or ""
+                        if "current" in class_attr or "current" in class_name_attr:
                             current_index = i
                             break
                     
@@ -224,6 +228,10 @@ def get_downloaded_pdfs(url,row_identifier) -> list:
                     break
             
             # Now download all collected PDFs in chunks of 10
+            if len(pdf_link_elements) > MAX_PDFS_PER_TICKER:
+                print(f"Limiting collected PDF links to first {MAX_PDFS_PER_TICKER}")
+                pdf_link_elements = pdf_link_elements[:MAX_PDFS_PER_TICKER]
+
             total_links = len(pdf_link_elements)
             print(f"Total PDF links collected: {total_links}")
             print(f"Starting chunked download (chunks of 10)...")
@@ -258,7 +266,7 @@ def get_downloaded_pdfs(url,row_identifier) -> list:
 tries = 0
 
 @tool
-def get_financial_statements(ticker:str,stock_exchange:str="NGX") -> Dict[str, Any]:
+def get_financial_statements(ticker:str,stock_exchange:str="NGX") -> Any:
     """
     Extract finanical statement information from NGX (Nigerian Stock Exchange) company profiles.
     
@@ -304,7 +312,11 @@ def get_financial_statements(ticker:str,stock_exchange:str="NGX") -> Dict[str, A
     
     downloaded_pdfs = get_downloaded_pdfs(url, row_identifier)
     
-    text_content = process_pdfs_in_batches(downloaded_pdfs)
+    text_content = process_pdfs_in_batches(
+        downloaded_pdfs=downloaded_pdfs,
+        ticker=ticker,
+        source_type="financial_statements",
+    )
     
     global tries
 

@@ -1,6 +1,7 @@
 from smolagents import WebSearchTool, CodeAgent, GoogleSearchTool
 from llms import minimax_27 as model
 from tools.earnings_growth import get_financial_statements
+from tools.ocr_store import get_ocr_aggregate, get_ocr_records, get_ocr_record_text
 import os
 import requests
 import json
@@ -46,8 +47,10 @@ WHAT TO LOOK FOR:
 
 SEARCH STRATEGY:
 1. Get the ticker/symbol through search if not provided
-2. Use the get_financial_statements tool to retrieve financial data
-3. Analyze the financial statements data and extract the most relevant information
+2. Use get_financial_statements to ingest financial-statement OCR data.
+3. Use get_ocr_aggregate and get_ocr_records to retrieve evidence in chunks.
+4. Use get_ocr_record_text only for records requiring deeper inspection.
+5. Analyze and extract the most relevant information.
 4. Focus on the following financial metrics:
    - Basic earnings per share (EPS) over multiple periods
    - Earnings per share growth rates
@@ -79,6 +82,9 @@ You must use the search strategy in the instructions to carry out the task
 
 tools = [
   get_financial_statements,
+  get_ocr_aggregate,
+  get_ocr_records,
+  get_ocr_record_text,
   google_search_tool,
 ]
 

@@ -10,6 +10,7 @@ import re
 
 from tools.corporate_disclosures import process_pdfs_in_batches
 
+MAX_PDFS_PER_TICKER = 2000
 def normalize_spacing(text):
     """
     Normalize spacing in a string by reducing multiple consecutive spaces to single spaces.
@@ -396,6 +397,10 @@ def get_downloaded_pdfs(url,row_identifier) -> list:
                     break
             
             # Now download all collected PDFs in chunks of 10
+            if len(pdf_link_elements) > MAX_PDFS_PER_TICKER:
+                print(f"Limiting collected PDF links to first {MAX_PDFS_PER_TICKER}")
+                pdf_link_elements = pdf_link_elements[:MAX_PDFS_PER_TICKER]
+
             total_links = len(pdf_link_elements)
             print(f"Total PDF links collected: {total_links}")
             print(f"Starting chunked download (chunks of 10)...")
@@ -476,7 +481,11 @@ def extract_director_disclosures(ticker:str,stock_exchange:str="NGX") -> list:
     
     downloaded_pdfs = get_downloaded_pdfs(url, row_identifier)
     
-    text_content = process_pdfs_in_batches(downloaded_pdfs)
+    text_content = process_pdfs_in_batches(
+        downloaded_pdfs=downloaded_pdfs,
+        ticker=ticker,
+        source_type="director_disclosures",
+    )
     
     global tries
 

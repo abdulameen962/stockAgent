@@ -5,6 +5,7 @@ import requests
 import json
 import skimage as ski
 from tools.corporate_disclosures import extract_corporate_disclosures
+from tools.ocr_store import get_ocr_aggregate, get_ocr_records, get_ocr_record_text
 import PIL
 
 search_tool = WebSearchTool()
@@ -42,9 +43,10 @@ WHAT TO LOOK FOR:
 
 SEARCH STRATEGY:
 1. Get the ticker/symbol through search if not provided
-2. Search for recent share buyback announcements and activity using the extract_corporate_disclosures tool
-3. From the text content returned by the extract_corporate_disclosures tool,pick the most suitable data from each dict
- and identify the following:
+2. Ingest recent disclosure OCR using extract_corporate_disclosures.
+3. Use get_ocr_aggregate and get_ocr_records to read evidence in pages/chunks.
+4. Only use get_ocr_record_text for specific records when deeper detail is needed.
+5. Identify the following:
 4. Analyze the data for:
    - Share buyback activity and program size
    - Buyback history and consistency
@@ -76,7 +78,7 @@ authorized_imports = [
 ]
 
 share_buyback_agent = CodeAgent(
-    tools=[extract_corporate_disclosures],
+    tools=[extract_corporate_disclosures, get_ocr_aggregate, get_ocr_records, get_ocr_record_text],
     model=model,
     planning_interval=4,
     max_steps=6,

@@ -3,7 +3,8 @@ from PIL import Image
 from typing import List, Dict, Any
 from .image_analyzer import ImageAnalyzer
 import asyncio
-import copy
+
+OCR_CONCURRENCY = 1
 
 
 async def get_image_result(image: Image.Image):
@@ -16,15 +17,12 @@ async def get_image_result(image: Image.Image):
     Returns:
         Dict[str, str]: Dictionary containing text extraction results from different OCR methods
     """
-    # Create a deep copy of the image to avoid thread safety issues
-    image_copy = image.copy()
-    
     analyzer = ImageAnalyzer()
     
     async def run_tesseract_ocr():
         """Run Tesseract OCR in a separate thread"""
         try:
-            return await asyncio.to_thread(analyzer.extract_text_ocr, image_copy)
+            return await asyncio.to_thread(analyzer.extract_text_ocr, image)
         except Exception as e:
             print(f"Tesseract OCR error: {e}")
             return ""
@@ -40,7 +38,7 @@ async def get_image_result(image: Image.Image):
     async def run_advanced_ocr():
         """Run Advanced OCR in a separate thread"""
         try:
-            return await asyncio.to_thread(analyzer.extract_text_advanced, image_copy)
+            return await asyncio.to_thread(analyzer.extract_text_advanced, image)
         except Exception as e:
             print(f"Advanced OCR error: {e}")
             return ""
@@ -103,10 +101,10 @@ async def read_images_async(images: List[Image.Image]) -> List[Dict[str, Any]]:
     """
 
     if not images:
-        return {"error": "No images provided for analysis"}
+        return []
     
     # Process images with proper error handling and concurrency limits
-    semaphore = asyncio.Semaphore(3)  # Limit concurrent processing to avoid memory issues
+    semaphore = asyncio.Semaphore(OCR_CONCURRENCY)
     
     async def process_image_with_semaphore(image):
         async with semaphore:

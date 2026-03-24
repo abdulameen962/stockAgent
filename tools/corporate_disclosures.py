@@ -7,10 +7,16 @@ import time
 from typing import List
 from PIL import Image
 from tools.image_analysis import read_images
+from tools.ocr_store import persist_ocr_records
 import gc
 from itertools import islice
 
 PDF_ANALYSIS_BATCH_SIZE = 20
+PDF_PAGE_CHUNK_SIZE = 2
+PDF_RENDER_DPI = 120
+MAX_PDFS_PER_TICKER = 2000
+MAX_PAGES_PER_PDF = 120
+MAX_RETURN_OCR_RECORDS = 120
 
 
 def _chunked(items, size):
@@ -22,28 +28,110 @@ def _chunked(items, size):
         yield batch
 
 
-def process_pdfs_in_batches(downloaded_pdfs, chunk_size: int = PDF_ANALYSIS_BATCH_SIZE):
+def process_pdfs_in_batches(
+    downloaded_pdfs,
+    ticker: str,
+    source_type: str,
+    chunk_size: int = PDF_ANALYSIS_BATCH_SIZE,
+    max_pdfs: int = MAX_PDFS_PER_TICKER,
+    max_pages_per_pdf: int = MAX_PAGES_PER_PDF,
+    max_return_records: int = MAX_RETURN_OCR_RECORDS,
+):
     """
-    Convert and OCR PDFs in small batches to avoid holding all images in memory.
+    Convert and OCR PDFs incrementally to avoid holding all pages in memory.
     """
     all_text_content = []
-    for pdf_batch in _chunked(downloaded_pdfs, chunk_size):
-        images_array = create_images_from_pdfs(pdf_batch)
-        if not images_array:
-            continue
-        batch_text = read_images(images_array)
-        if isinstance(batch_text, list):
-            all_text_content.extend(batch_text)
+    bounded_pdfs = downloaded_pdfs[:max_pdfs]
+    if len(downloaded_pdfs) > max_pdfs:
+        print(f"Limiting PDF processing to first {max_pdfs} files")
 
-        # Explicitly release PIL image memory between batches
-        for image in images_array:
-            try:
-                image.close()
-            except Exception:
-                pass
-        del images_array
-        gc.collect()
+    for pdf_batch in _chunked(bounded_pdfs, chunk_size):
+        for pdf_index, pdf_path in enumerate(pdf_batch):
+            for chunk_index, images_array in enumerate(
+                iter_pdf_image_chunks(
+                pdf_path,
+                page_chunk_size=PDF_PAGE_CHUNK_SIZE,
+                dpi=PDF_RENDER_DPI,
+                max_pages=max_pages_per_pdf,
+                )
+            ):
+                batch_text = read_images(images_array)
+                if isinstance(batch_text, list):
+                    persist_ocr_records(
+                        ticker=ticker,
+                        source_type=source_type,
+                        records=batch_text,
+                        doc_ref_prefix=f"{os.path.basename(pdf_path)}::{pdf_index}-{chunk_index}",
+                    )
+                    remaining = max_return_records - len(all_text_content)
+                    if remaining > 0:
+                        all_text_content.extend(batch_text[:remaining])
+
+                # Explicitly release PIL image memory between chunks
+                for image in images_array:
+                    try:
+                        image.close()
+                    except Exception:
+                        pass
+                del images_array
+                gc.collect()
     return all_text_content
+
+
+def iter_pdf_image_chunks(
+    pdf_path: str,
+    page_chunk_size: int = 2,
+    dpi: int = 120,
+    max_pages: int = MAX_PAGES_PER_PDF,
+):
+    """
+    Yield small lists of rendered pages for a single PDF.
+    This keeps peak memory usage bounded for large files.
+    """
+    total_pages = get_pdf_page_count(pdf_path)
+
+    if total_pages is None:
+        current_page = 1
+        while True:
+            if current_page > max_pages:
+                break
+            try:
+                chunk_images = convert_from_path(
+                    pdf_path,
+                    dpi=dpi,
+                    first_page=current_page,
+                    last_page=current_page + page_chunk_size - 1,
+                    thread_count=1,
+                    grayscale=True,
+                )
+                if not chunk_images:
+                    break
+                yield chunk_images
+                current_page += page_chunk_size
+            except Exception:
+                break
+        return
+
+    effective_total_pages = min(total_pages, max_pages)
+    if total_pages > max_pages:
+        print(f"Limiting page processing to first {max_pages} pages for {pdf_path}")
+
+    for start_page in range(1, effective_total_pages + 1, page_chunk_size):
+        end_page = min(start_page + page_chunk_size - 1, effective_total_pages)
+        print(f"Processing pages {start_page}-{end_page} of {total_pages}")
+        try:
+            chunk_images = convert_from_path(
+                pdf_path,
+                dpi=dpi,
+                first_page=start_page,
+                last_page=end_page,
+                thread_count=1,
+                grayscale=True,
+            )
+            if chunk_images:
+                yield chunk_images
+        except Exception as e:
+            print(f"Error processing pages {start_page}-{end_page} of {pdf_path}: {e}")
 
 def get_pdf_page_count(pdf_path):
     """
@@ -411,6 +499,10 @@ def get_downloaded_pdfs(url,row_identifier) -> list:
                     break
             
             # Now download all collected PDFs in chunks of 10
+            if len(pdf_link_elements) > MAX_PDFS_PER_TICKER:
+                print(f"Limiting collected PDF links to first {MAX_PDFS_PER_TICKER}")
+                pdf_link_elements = pdf_link_elements[:MAX_PDFS_PER_TICKER]
+
             total_links = len(pdf_link_elements)
             print(f"Total PDF links collected: {total_links}")
             print(f"Starting chunked download (chunks of 10)...")
@@ -488,7 +580,11 @@ def extract_corporate_disclosures(ticker:str,stock_exchange:str="NGX") -> List:
 
     downloaded_pdfs = get_downloaded_pdfs(url, row_identifier)
 
-    text_content = process_pdfs_in_batches(downloaded_pdfs)
+    text_content = process_pdfs_in_batches(
+        downloaded_pdfs=downloaded_pdfs,
+        ticker=ticker,
+        source_type="corporate_disclosures",
+    )
 
     global tries
     # Delete all downloaded PDFs after extracting information

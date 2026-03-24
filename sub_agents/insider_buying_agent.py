@@ -5,6 +5,7 @@ import requests
 import json
 # import tempfile
 from tools.director_disclosure import extract_director_disclosures
+from tools.ocr_store import get_ocr_aggregate, get_ocr_records, get_ocr_record_text
 
 search_tool = WebSearchTool()
 
@@ -48,9 +49,10 @@ WHAT TO LOOK FOR:
 
 SEARCH STRATEGY:
 1. Get the ticker/symbol through search if not provided
-2. Search for recent insider trading activity using the extract_director_disclosures tool
-3 Parse the data gotten from the tool pick the most suitable data from each dict
- and use it to answer the question
+2. Ingest insider disclosure OCR using extract_director_disclosures.
+3. Use get_ocr_aggregate and get_ocr_records to read evidence in pages/chunks.
+4. Only use get_ocr_record_text for specific records when deeper detail is needed.
+5. Parse and use the data to answer the question.
 After that then:
 - Analyze the data for:
 1. Insider buying vs. selling patterns
@@ -74,7 +76,7 @@ You must use the search strategy in the instructions to carry out the task
 """
 
 insider_buying_agent = CodeAgent(
-    tools=[extract_director_disclosures],
+    tools=[extract_director_disclosures, get_ocr_aggregate, get_ocr_records, get_ocr_record_text],
     model=model,
     planning_interval=4,
     max_steps=6,
